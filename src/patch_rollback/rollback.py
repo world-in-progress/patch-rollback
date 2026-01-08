@@ -6,7 +6,7 @@ from .crm import Patch
 from .model.patch import PatchMeta
 from .model.schema import GridSchema
 from .preprocessor import preprocess
-from .fdb_feature import Ne, Ns, IndexLike
+from .feature.fdb_feature import Ne, Ns, IndexLike
 
 def rollback(
     patch_name: str, schema_name: str,

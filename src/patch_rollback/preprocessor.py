@@ -5,7 +5,7 @@ from pathlib import Path
 import multiprocessing as mp
 from functools import partial
 
-from .fdb_feature import IndexLike, SideTopoInfo, Ne, Ns
+from .feature.fdb_feature import IndexLike, SideTopoInfo, Ne, Ns
 
 def create_ne_fdb_parallel(ne_fn: str, fdb_fn: str):
     """Create NE FDB from NE file in parallel"""

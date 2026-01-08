@@ -30,16 +30,3 @@ if __name__ == '__main__':
         target_patch='./resource/output/patch/',
         target_schema='./resource/output/schema/'
     )
-    
-    # preprocess(
-    #     resource_ne='./resource/ne.txt',
-    #     resource_ns='./resource/ns.txt',
-    #     output_ne_fdb='./fdb/ne.fdb',
-    #     output_ns_fdb='./fdb/ns.fdb',
-    #     check=False
-    # )
-    
-    # import fastdb4py as fdb
-    
-    # db = fdb.ORM.load('shared_ne')
-    # db.unlink()
