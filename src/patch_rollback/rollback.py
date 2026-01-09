@@ -73,7 +73,6 @@ def rollback(
     
     nes = ne_fdb[Ne][Ne]
     nss = ns_fdb[Ns][Ns]
-    # sts = ns_fdb[SideTopoInfo][SideTopoInfo]
     
     e_num = len(nes)
     
@@ -86,9 +85,9 @@ def rollback(
     isl1 = copy_to_taichi(ne_fdb[IndexLike]['isl1'].column.index, ti.i32, [e_num, 10])
     isl3 = copy_to_taichi(ne_fdb[IndexLike]['isl3'].column.index, ti.i32, [e_num, 10])
     
-    bbox = ti.field(dtype=ti.f32, shape=4) # xmin, ymin, xmax, ymax
     
     level_num = len(element_resolution)
+    bbox = ti.field(dtype=ti.f32, shape=4) # xmin, ymin, xmax, ymax
     resolutions = ti.field(dtype=ti.f32, shape=(len(element_resolution), 2))
     resolutions.from_numpy(np.array(element_resolution, dtype=np.float32))
     
@@ -136,10 +135,12 @@ def rollback(
     bbox_np = bbox.to_numpy()
     print(f'Bounding Box: xmin={bbox_np[0]}, ymin={bbox_np[1]}, xmax={bbox_np[2]}, ymax={bbox_np[3]}')
     
+    # Print domain size
     domain_width = bbox_np[2] - bbox_np[0]
     domain_height = bbox_np[3] - bbox_np[1]
     print(f'Domain Size: width={domain_width}, height={domain_height}')
     
+    # Compute cell rows and cols in each level
     level_infos: list[list[int]] = [[] for _ in range(level_num)]   # level_infos[level] = cell rows and cols of that level
     for level_idx in range(level_num):
         level = level_idx + 1
@@ -195,20 +196,18 @@ def rollback(
     assign_global_ids()
     global_ids_np = global_ids.to_numpy()[1:]   # skip the first virtual element
     
-    # Collect subdividable gids in each level
+    # Collect real activated gids in each level
     activated_cell_info: list[list[int]] = [[] for _ in range(level_num)]  # activated_cell_info[level] = [gid1, gid2, ...]
     for ei in range(e_num - 1):
         level = levels_np[ei]
         gid = global_ids_np[ei]
         activated_cell_info[level - 1].append(gid)
     
-    # Collect subdividable cells' parents from the finest level to the coarsest level
-    # To ensure all parent cells are included, we iteratively go through each level
+    # Collect real activated cells' parents from the finest level to the coarsest level
+    # To ensure all parent cells are included, iteratively going through each level
     subdividable_gids_in_levels: list[set[int]] = [set() for _ in range(level_num)]
     current_level = level_num
-    for level in range(current_level, 1, -1):   # Skip level 0 (non-existent) and level 1 (no parents)
-        cell_num = len(activated_cell_info[level - 1])
-        
+    for level in range(current_level, 1, -1):   # skip level 0 (non-existent) and level 1 (no parents)
         # First, try to get parents of already subdividable gids in this level
         _, p_gids = patch.get_parents(
             levels=[level] * len(subdividable_gids_in_levels[level - 1]),
@@ -217,15 +216,15 @@ def rollback(
         for pgid in p_gids:
             subdividable_gids_in_levels[level - 2].add(pgid)
         
-        # Then, get parents of activated gids in this level
+        # Then, get parents of real activated cells in this level
         _, p_gids = patch.get_parents(
-            levels= [level] * cell_num, 
+            levels= [level] * len(activated_cell_info[level - 1]), 
             global_ids= activated_cell_info[level - 1]
         )
         for pgid in p_gids:
             subdividable_gids_in_levels[level - 2].add(pgid)
     
-    # Subdivide cells in each level
+    # Subdivide cells in the new patch according to subdividable gids collected
     for level_idx, subdividable_gids in enumerate(subdividable_gids_in_levels):
         level = level_idx + 1
         patch.subdivide_grids(
@@ -233,10 +232,11 @@ def rollback(
             global_ids= list(subdividable_gids)
         )
         
-    # Get all activated cells in the patch
+    # Get all current activated cells in the patch
     active_grid_indices = patch.get_active_grid_indices()
     
-    # Decode levels and global ids from recorded active grid indices
+    # Encode levels and global ids from real activated cells
+    # The set of these cells is a subset of `active_grid_indices`
     real_active_indices = encode_index_batch(levels_np, global_ids_np)
     
     # Mark those not in real_active_indices as deleted by numpy set difference
